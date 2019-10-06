@@ -5,7 +5,7 @@
  * Copyright (c) 2009, Patrick A. Palmer.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  *   - Redistributions of source code must retain the above copyright notice,
@@ -19,21 +19,22 @@
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- */ 
+ */
 
 #include <cstring>
 #include <ctime>
+#include <vector>
 
 #include "DPX.h"
 #include "DPXStream.h"
@@ -42,22 +43,22 @@
 
 
 
-dpx::Writer::Writer() : fileLoc(0)
+DPX_EXPORT dpx::Writer::Writer() : fileLoc(0)
 {
 }
 
 
-dpx::Writer::~Writer()
+DPX_EXPORT dpx::Writer::~Writer()
 {
 }
 
 
-void dpx::Writer::Start()
+DPX_EXPORT void dpx::Writer::Start()
 {
 }
 
 
-void dpx::Writer::SetFileInfo(const char *fileName, const char *creationTimeDate, const char *creator,
+DPX_EXPORT void dpx::Writer::SetFileInfo(const char *fileName, const char *creationTimeDate, const char *creator,
 			const char *project, const char *copyright, const U32 encryptKey, const bool swapEndian)
 {
 	if (fileName)
@@ -66,88 +67,91 @@ void dpx::Writer::SetFileInfo(const char *fileName, const char *creationTimeDate
 	if (creationTimeDate)
 		this->header.SetCreationTimeDate(creationTimeDate);
 	else
-	{	
+	{
 		time_t seconds = time(0);
 		this->header.SetCreationTimeDate(seconds);
 	}
-	
+
 	if (creator)
 		this->header.SetCreator(creator);
 	else
 		this->header.SetCreator("OpenDPX library");
-		
+
 	if (project)
 		this->header.SetProject(project);
 	if (copyright)
 		this->header.SetCopyright(copyright);
 	this->header.SetEncryptKey(encryptKey);
-	
+
 	if (swapEndian)
 	    this->header.magicNumber = SwapBytes(this->header.magicNumber);
 }
 
 
-void dpx::Writer::SetImageInfo(const U32 width, const U32 height)
+DPX_EXPORT void dpx::Writer::SetImageInfo(const U32 width, const U32 height)
 {
 	this->header.SetImageOrientation(kLeftToRightTopToBottom);
 	this->header.SetPixelsPerLine(width);
 	this->header.SetLinesPerElement(height);
 }
 
-		
+
 // returns next available or MAX_ELEMENTS if full
-int dpx::Writer::NextAvailElement() const
+DPX_EXPORT int dpx::Writer::NextAvailElement() const
 {
 	unsigned int i;
-	
+
 	for (i = 0; i < MAX_ELEMENTS; i++)
 	{
 		if (this->header.ImageDescriptor(i) == kUndefinedDescriptor)
 			break;
 	}
-	
+
 	return i;
 }
 
 
-void dpx::Writer::SetOutStream(OutStream *fd)
+DPX_EXPORT void dpx::Writer::SetOutStream(OutStream *fd)
 {
 	this->fd = fd;
 }
 
 
-bool dpx::Writer::WriteHeader()
+DPX_EXPORT bool dpx::Writer::WriteHeader()
 {
 	// calculate any header info
 	this->header.CalculateOffsets();
 
-	// seek to the beginning of the file	
+	// seek to the beginning of the file
 	if (!this->fd->Seek(0, OutStream::kStart))
 		return false;
 
 	// writing the header count
-	this->fileLoc = this->header.Size(); 
-	
+	this->fileLoc = this->header.Size();
+
 	return this->header.Write(fd);
 }
 
 
-void dpx::Writer::SetUserData(const long size)
+DPX_EXPORT void dpx::Writer::SetUserData(const long size)
 {
-	// TODO
+	this->header.SetUserSize(size);
 }
 
 
-bool dpx::Writer::WriteUserData(void *data)
+DPX_EXPORT bool dpx::Writer::WriteUserData(void *data)
 {
-	// XXX TODO
-	return false;
+    size_t size = this->header.UserSize();
+	if (!fd->WriteCheck(data, size))
+		return false;
+    this->fileLoc += size;
+	return true;
 }
 
 
-void dpx::Writer::SetElement(const int num, const Descriptor desc, const U8 bitDepth,
+DPX_EXPORT void dpx::Writer::SetElement(const int num, const Descriptor desc, const U8 bitDepth,
 			const Characteristic transfer, const Characteristic colorimetric,
-			const Packing packing, const Encoding encoding, const U32 dataSign, 
+			const Packing packing, const Encoding encoding, const U32 dataSign,
 			const U32 lowData, const R32 lowQuantity,
 			const U32 highData, const R32 highQuantity,
 			const U32 eolnPadding, const U32 eoimPadding)
@@ -163,7 +167,7 @@ void dpx::Writer::SetElement(const int num, const Descriptor desc, const U8 bitD
 	this->header.SetHighData(num, highData);
 	this->header.SetHighQuantity(num, highQuantity);
 	this->header.SetImageDescriptor(num, desc);
-	this->header.SetTransfer(num, transfer);	
+	this->header.SetTransfer(num, transfer);
 	this->header.SetColorimetric(num, colorimetric);
 	this->header.SetBitDepth(num, bitDepth);
 	this->header.SetImagePacking(num, packing);
@@ -175,10 +179,22 @@ void dpx::Writer::SetElement(const int num, const Descriptor desc, const U8 bitD
 	this->header.CalculateNumberOfElements();
 }
 
+DPX_EXPORT bool dpx::Writer::WritePadData(const int alignment)
+{
+    int imageoffset = ((this->fileLoc + alignment - 1)/alignment)*alignment;
+    int padsize = imageoffset - this->fileLoc;
+    if (padsize > 0) {
+        std::vector<dpx::U8> pad (padsize, 0xff);
+        this->fileLoc += this->fd->Write (&pad[0], padsize);
+        if (this->fileLoc != imageoffset)
+            return false;
+    }
+    return true;
+}
 
 // the data is processed so write it straight through
 // argument count is total size in bytes of the passed data
-bool dpx::Writer::WriteElement(const int element, void *data, const long count)
+DPX_EXPORT bool dpx::Writer::WriteElement(const int element, void *data, const long count)
 {
 	// make sure the range is good
 	if (element < 0 || element >= MAX_ELEMENTS)
@@ -188,17 +204,21 @@ bool dpx::Writer::WriteElement(const int element, void *data, const long count)
 	if (this->header.ImageDescriptor(element) == kUndefinedDescriptor)
 		return false;
 
+	// The DPX spec recommends that the image data starts on a 8K boundry.
+	if (! this->WritePadData(0x2000))
+		return false;
+
 	// update file ptr
 	this->header.SetDataOffset(element, this->fileLoc);
 	this->fileLoc += count;
-		
+
 	// write
-	return (this->fd->Write(data, count) > 0);
+	return this->fd->WriteCheck(data, count);
 }
 
 
 
-bool dpx::Writer::WriteElement(const int element, void *data)
+DPX_EXPORT bool dpx::Writer::WriteElement(const int element, void *data)
 {
 	// make sure the range is good
 	if (element < 0 || element >= MAX_ELEMENTS)
@@ -211,12 +231,10 @@ bool dpx::Writer::WriteElement(const int element, void *data)
 	return this->WriteElement(element, data, this->header.ComponentDataSize(element));
 }
 
-
-
-bool dpx::Writer::WriteElement(const int element, void *data, const DataSize size)
+DPX_EXPORT bool dpx::Writer::WriteElement(const int element, void *data, const DataSize size)
 {
-	bool status = true;	
-	
+	bool status = true;
+
 	// make sure the range is good
 	if (element < 0 || element >= MAX_ELEMENTS)
 		return false;
@@ -225,17 +243,21 @@ bool dpx::Writer::WriteElement(const int element, void *data, const DataSize siz
 	if (this->header.ImageDescriptor(element) == kUndefinedDescriptor)
 		return false;
 
+	// The DPX spec recommends that the image data starts on a 8K boundry.
+	if (! this->WritePadData(0x2000))
+		return false;
+
 	// mark location in headers
 	if (element == 0)
 		this->header.SetImageOffset(this->fileLoc);
 	this->header.SetDataOffset(element, this->fileLoc);
-	
+
 	// reverse the order of the components
 	bool reverse = false;
 
 	// rle encoding?
 	const bool rle = this->header.ImageEncoding(element) == kRLE;
-	
+
 	// image parameters
 	const U32 eolnPad = this->header.EndOfLinePadding(element);
 	const U32 eoimPad = this->header.EndOfImagePadding(element);
@@ -262,10 +284,10 @@ bool dpx::Writer::WriteElement(const int element, void *data, const DataSize siz
 	}
 
 	// can we write the entire memory chunk at once without any additional processing
-	if (!rle  &&
+	if (!rle  && !this->header.RequiresByteSwap() &&
 		((bitDepth == 8 && size == dpx::kByte) ||
-		 (bitDepth == 12 && size == dpx::kWord && packing == kFilledMethodA) || 
-		 (bitDepth == 16 && size == dpx::kWord) || 
+		 (bitDepth == 12 && size == dpx::kWord && packing == kFilledMethodA) ||
+		 (bitDepth == 16 && size == dpx::kWord) ||
 		 (bitDepth == 32 && size == dpx::kFloat) ||
 		 (bitDepth == 64 && size == dpx::kDouble)))
 	{
@@ -274,7 +296,7 @@ bool dpx::Writer::WriteElement(const int element, void *data, const DataSize siz
 			delete [] blank;
 		return status;
 	}
-	else 
+	else
 	{
 		switch (bitDepth)
 		{
@@ -325,35 +347,35 @@ bool dpx::Writer::WriteElement(const int element, void *data, const DataSize siz
 			break;
 		}
 	}
-	
+
 	// if successful
 	if (status && eoimPad)
 	{
 		// end of image padding
 		this->fileLoc += eoimPad;
-		status = (this->fd->Write(blank, eoimPad) > 0);
+		status = this->fd->WriteCheck(blank, eoimPad);
 	}
-	
+
 	// rid of memory
 	if (blank)
 		delete [] blank;
-		
+
 	return status;
 }
 
 
 // the passed in image buffer is written to the file untouched
 
-bool dpx::Writer::WriteThrough(void *data, const U32 width, const U32 height, const int noc, const int bytes, const U32 eolnPad, const U32 eoimPad, char *blank)
+DPX_EXPORT bool dpx::Writer::WriteThrough(void *data, const U32 width, const U32 height, const int noc, const int bytes, const U32 eolnPad, const U32 eoimPad, char *blank)
 {
 	bool status = true;
-	const int count = width * height * noc;
+	const size_t count = size_t(width) * size_t(height) * noc;
 	unsigned int i;
 	unsigned char *imageBuf = reinterpret_cast<unsigned char*>(data);
-	
+
 	// file pointer location after write
 	this->fileLoc += bytes * count + (eolnPad * height);
-		
+
 	// write data
 	if (eolnPad)
 	{
@@ -361,14 +383,14 @@ bool dpx::Writer::WriteThrough(void *data, const U32 width, const U32 height, co
 		for (i = 0; i < height; i++)
 		{
 			// write one line
-			if (this->fd->Write(imageBuf+(width*bytes*i), bytes * width) == false)
+			if (!this->fd->WriteCheck(imageBuf+(width*bytes*i), bytes * width))
 			{
 				status = false;
 				break;
 			}
-			
+
 			// write end of line padding
-			if (this->fd->Write(blank, eoimPad) == false)
+			if (!this->fd->WriteCheck(blank, eoimPad))
 			{
 				status = false;
 				break;
@@ -378,30 +400,30 @@ bool dpx::Writer::WriteThrough(void *data, const U32 width, const U32 height, co
 	else
 	{
 		// write data as one chunk
-		if (this->fd->Write(imageBuf, bytes * count) == false)
+		if (!this->fd->WriteCheck(imageBuf, bytes * count))
 		{
 			status = false;
 		}
-	}		
+	}
 
 	// end of image padding
 	if (status && eoimPad)
 	{
 		this->fileLoc += eoimPad;
-		status = (this->fd->Write(blank, eoimPad) > 0);
+		status = this->fd->WriteCheck(blank, eoimPad);
 	}
-	
+
 	return status;
 }
 
 
 
 
-bool dpx::Writer::Finish()
+DPX_EXPORT bool dpx::Writer::Finish()
 {
 	// write the file size in the header
 	this->header.SetFileSize(this->fileLoc);
-	
+
 	// rewrite all of the offsets in the header
 	return this->header.WriteOffsetData(this->fd);
 }

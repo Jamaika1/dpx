@@ -6,7 +6,7 @@
  * Copyright (c) 2009, Patrick A. Palmer.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  *   - Redistributions of source code must retain the above copyright notice,
@@ -20,16 +20,16 @@
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
@@ -42,45 +42,45 @@
 
 #include "DPXHeader.h"
 #include "DPXStream.h"
-
+#include "DPXExport.h"
 
 /*!
- * \def OPENDPX_VERSION 
+ * \def OPENDPX_VERSION
  * \brief OpenDPX Version
  */
 #define OPENDPX_VERSION		"0.5.0"
 
 
 
-	
+
 /*!
  * \namespace dpx
- * \brief OpenDPX namespace 
+ * \brief OpenDPX namespace
  */
 namespace dpx
 {
 	// forward definitions
 	class Codec;
 	class ElementReadStream;
-	
-	/*! 
+
+	/*!
 	 * \enum Endian
-	 * \brief DPX files can be stored in big- or little-endian byte order 
+	 * \brief DPX files can be stored in big- or little-endian byte order
 	 */
 	enum Endian
 	{
 		kLittleEndian,								//!< increasing numeric significance with increasing memory
 		kBigEndian									//!< big end first
 	};
-	
+
 
 	/*! \struct Block
 	 * \brief Rectangle block definition defined by two points
 	 */
-	struct Block 
+	struct Block
 	{
 		int x1, y1, x2, y2;
-		
+
 		/*!
 		 * \brief Constructor
 		 */
@@ -126,7 +126,7 @@ namespace dpx
 	extern Endian systemByteOrder;
 
 	// namespace functions
-	
+
 	/*!
 	 * \brief determine if the image file is DPX
 	 *
@@ -142,7 +142,7 @@ namespace dpx
 	 * \return true/false if identified as DPX
 	 */
 	bool IdentifyFile(const void *data);
-	
+
 	/*!
 	 * \brief returns a char * of the default DPX file extension
 	 *
@@ -173,7 +173,7 @@ namespace dpx
 	 * \class Reader
 	 * \brief DPX Image Reader class
 	 */
-	 
+
 	class Reader
 	{
 
@@ -181,50 +181,50 @@ namespace dpx
 
 		/*!
 		 * \brief DPX header
-		 */	
+		 */
 		Header header;
 
 		/*!
 		 * \brief Constructor
-		 */			
-		Reader();
-		
+		 */
+		DPX_EXPORT Reader();
+
 		/*!
 		 * \brief Destructor
-		 */			
-		virtual ~Reader();
+		 */
+		DPX_EXPORT virtual ~Reader();
 
 		/*!
 		 * \brief Set the InStream object to be used to read images
 		 *
 		 * \param stream Object to use for low level reads
-		 */	
-		void SetInStream(InStream *stream);
+		 */
+		DPX_EXPORT void SetInStream(InStream *stream);
 
 		/*!
 		 * \brief clear any caching or memory allocated specific to an image
-		 */			
-		void Reset();
-		
+		 */
+		DPX_EXPORT void Reset();
+
 		/*!
 		 * \brief Read the dpx header into the header member
 		 *
 		 * \return success true/false
-		 */	
-		bool ReadHeader();
+		 */
+		DPX_EXPORT bool ReadHeader();
 
 		/*!
 		 * \brief Read an image element into a buffer
-		 * 
+		 *
 		 * the size of the buffer must be large enough
 		 * simple calculation would be:
 		 *     width * height * num_of_components * size_of_component
-		 * 
+		 *
 		 * \param element element (0-7)
 		 * \param data buffer
 		 * \return success true/false
-		 */			
-		bool ReadImage(const int element, void *data);
+		 */
+		DPX_EXPORT bool ReadImage(const int element, void *data);
 
 		/*!
 		 * \brief Read an image element into a buffer that matches the image description type
@@ -237,8 +237,8 @@ namespace dpx
 		 * \param size size of the buffer component
 		 * \param desc element description type
 		 * \return success true/false
-		 */	
-		bool ReadImage(void *data, const DataSize size = kWord,  
+		 */
+		DPX_EXPORT bool ReadImage(void *data, const DataSize size = kWord,
 			const Descriptor desc = kRGB);
 
 		/*!
@@ -248,8 +248,8 @@ namespace dpx
 		 * \param data buffer
 		 * \param block image area to read
 		 * \return success true/false
-		 */	
-		bool ReadBlock(const int element, unsigned char *data, Block &block);
+		 */
+		DPX_EXPORT bool ReadBlock(const int element, unsigned char *data, Block &block);
 
 		/*!
 		 * \brief Read a rectangular image block into a buffer from the image element
@@ -260,31 +260,31 @@ namespace dpx
 		 * \param block image area to read
 		 * \param desc element description type
 		 * \return success true/false
-		 */			
-		bool ReadBlock(void *data, const DataSize size, Block &block,
+		 */
+		DPX_EXPORT bool ReadBlock(void *data, const DataSize size, Block &block,
 			const Descriptor desc = kRGB);
 
 		/*!
-		 * \brief Read the user data into a buffer.  
+		 * \brief Read the user data into a buffer.
 		 *
 		 * Buffer must be large enough to hold the user data.
 		 *
 		 * \param data buffer
 		 * \return success true/false
-		 */	
-		bool ReadUserData(unsigned char *data);
-		
+		 */
+		DPX_EXPORT bool ReadUserData(unsigned char *data);
 
-	protected:			
+
+	protected:
 		InStream *fd;
-		
+
 		Codec *codex[MAX_ELEMENTS];
 		ElementReadStream *rio;
 	};
-	
-	
-	
-	
+
+
+
+
 
 
 
@@ -294,31 +294,31 @@ namespace dpx
 	 * \class Writer
 	 * \brief DPX Image Writer class
 	 */
-	 
+
 	class Writer
 	{
-	
+
 	public:
-	
+
 		/*!
 		 * \brief DPX Header
-		 */		
+		 */
 		Header header;
 
 		/*!
 		 * \brief Constructor
-		 */			
-		Writer();
-		
+		 */
+		DPX_EXPORT Writer();
+
 		/*!
 		 * \brief Destructor
-		 */	
-		virtual ~Writer();
-		
+		 */
+		DPX_EXPORT virtual ~Writer();
+
 		/*!
 		 * \brief Start defining the header and writing the images
-		 */		
-		void Start();
+		 */
+		DPX_EXPORT void Start();
 
 		/*!
 		 * \brief Set the basic file information about DPX
@@ -334,8 +334,8 @@ namespace dpx
 		 * \param copyright copyright statement (200 characters max)
 		 * \param encryptKey encryption key
 		 * \param swapEndian whether to write the image header in reverse to native endianness
-		 */			
-		void SetFileInfo(const char *fileName, const char *creationTimeDate = 0, const char *creator = 0,
+		 */
+		DPX_EXPORT void SetFileInfo(const char *fileName, const char *creationTimeDate = 0, const char *creator = 0,
 			const char *project = 0, const char *copyright = 0, const U32 encryptKey = ~0,
 			const bool swapEndian = false);
 
@@ -344,18 +344,18 @@ namespace dpx
 		 *
 		 * \param width width of the image
 		 * \param height height of the image
-		 */			
-		void SetImageInfo(const U32 width, const U32 height);
+		 */
+		DPX_EXPORT void SetImageInfo(const U32 width, const U32 height);
 
 		/*!
 		 * \brief Get the next available element
 		 * \return next available
 		 */
-		int NextAvailElement() const;
+		DPX_EXPORT int NextAvailElement() const;
 
 
 		/*!
-		 * \brief Set the parameters on an element  
+		 * \brief Set the parameters on an element
 		 *
 		 * There are 8 elements maximum in an single DPX and each element used must be set before writing the header
 		 *
@@ -373,15 +373,15 @@ namespace dpx
 		 * \param highQuantity
 		 * \param eolnPadding end of line padding (in bytes)
 		 * \param eoimPadding end of image padding (in bytes)
-		 */			
-		void SetElement(const int element = 0, 
-			const Descriptor desc = kRGB, 
+		 */
+		DPX_EXPORT void SetElement(const int element = 0,
+			const Descriptor desc = kRGB,
 			const U8 bitDepth = 10,
-			const Characteristic transfer = kLogarithmic, 
+			const Characteristic transfer = kLogarithmic,
 			const Characteristic colorimetric = kLogarithmic,
-			const Packing packing = kFilledMethodA, 
+			const Packing packing = kFilledMethodA,
 			const Encoding encoding = kNone,
-			const U32 dataSign = 0, 
+			const U32 dataSign = 0,
 			const U32 lowData = ~0, const R32 lowQuantity = std::numeric_limits<float>::quiet_NaN(),
 			const U32 highData = ~0, const R32 highQuantity = std::numeric_limits<float>::quiet_NaN(),
 			const U32 eolnPadding = 0, const U32 eoimPadding = 0);
@@ -390,30 +390,38 @@ namespace dpx
 		 * \brief Set the OutStream object will use to write the files
 		 *
 		 * \param stream OutStream object
-		 */	
-		void SetOutStream(OutStream *stream);
+		 */
+		DPX_EXPORT void SetOutStream(OutStream *stream);
 
 		/*!
 		 * \brief Set the size of the user data area
-		 * 
+		 *
 		 * \param size size of user data
-		 */	
-		void SetUserData(const long size);
+		 */
+		DPX_EXPORT void SetUserData(const long size);
 
 		/*!
 		 * \brief Write the header
 		 *
 		 * \return success true/false
-		 */	
-		bool WriteHeader();
-		
+		 */
+		DPX_EXPORT bool WriteHeader();
+
 		/*!
 		 * \brief Write the user data
 		 *
 		 * \param data buffer - must match size set in Writer::SetUserData()
 		 * \return success true/false
 		 */
-		bool WriteUserData(void *data);
+		DPX_EXPORT bool WriteUserData(void *data);
+
+		/*!
+         * \brief Write out some padded data to the specified boundary
+         *
+         * \param alignment -- Where the block boundary should be
+         * \return success true/false
+        DPX_EXPORT  */
+        DPX_EXPORT bool WritePadData(const int alignment);
 
 		/*!
 		 * \brief Write the entire element to the dpx file
@@ -421,27 +429,27 @@ namespace dpx
 		 * \param element element number (0-7)
 		 * \param data buffer
 		 * \return success true/false
-		 */			
-		bool WriteElement(const int element, void *data);
-		bool WriteElement(const int element, void *data, const DataSize size);
-		bool WriteElement(const int element, void *data, const long count);
+		 */
+		DPX_EXPORT bool WriteElement(const int element, void *data);
+		DPX_EXPORT bool WriteElement(const int element, void *data, const DataSize size);
+		DPX_EXPORT bool WriteElement(const int element, void *data, const long count);
 
 		/**
 		 * \brief Finish up writing image
 		 *
 		 * \return success true/false
-		 */			
-		bool Finish();
+		 */
+		DPX_EXPORT bool Finish();
 
 
 	protected:
 		long fileLoc;
 		OutStream *fd;
-		
+
 		bool WriteThrough(void *, const U32, const U32, const int, const int, const U32, const U32, char *);
-		
+
 	};
-	
+
 }
 
 
@@ -465,20 +473,20 @@ inline const char *dpx::LibraryVersion()
 
 
 inline dpx::Block::Block() : x1(0), y1(0), x2(0), y2(0)
-{ 
+{
 }
 
 
 inline dpx::Block::Block(const int x1, const int y1, const int x2, const int y2) : x1(x1), y1(y1), x2(x2), y2(y2)
-{ 
+{
 	this->Check();
 }
 
 
 inline void dpx::Block::Set(const int x1, const int y1, const int x2, const int y2)
 {
-	this->x1 = x1; 
-	this->y1 = y1; 
+	this->x1 = x1;
+	this->y1 = y1;
 	this->x2 = x2;
 	this->y2 = y2;
 }

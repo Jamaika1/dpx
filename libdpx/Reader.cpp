@@ -5,7 +5,7 @@
  * Copyright (c) 2009, Patrick A. Palmer.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  *   - Redistributions of source code must retain the above copyright notice,
@@ -19,18 +19,18 @@
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- */ 
+ */
 
 #include <cstdio>
 #include <cstring>
@@ -44,8 +44,16 @@
 #include "RunLengthEncoding.h"
 
 
+#ifdef LIBDPX_THREADS
+#include "../IlmThread/IlmThread.h"
+#include "../IlmThread/IlmThreadPool.h"
 
-dpx::Reader::Reader() : fd(0), rio(0)
+using namespace IlmThread;
+#endif
+
+
+
+DPX_EXPORT dpx::Reader::Reader() : fd(0), rio(0)
 {
 	// initialize all of the Codec* to NULL
 	for (int i = 0; i < MAX_ELEMENTS; i++)
@@ -53,15 +61,16 @@ dpx::Reader::Reader() : fd(0), rio(0)
 }
 
 
-dpx::Reader::~Reader()
+DPX_EXPORT dpx::Reader::~Reader()
 {
 	this->Reset();
-}	
+    delete this->rio;
+}
 
 
-void dpx::Reader::Reset()
+DPX_EXPORT void dpx::Reader::Reset()
 {
-	// delete all of the Codec * entries	
+	// delete all of the Codec * entries
 	for (int i = 0; i < MAX_ELEMENTS; i++)
 		if (this->codex[i])
 		{
@@ -80,20 +89,20 @@ void dpx::Reader::Reset()
 }
 
 
-void dpx::Reader::SetInStream(InStream *fd)
+DPX_EXPORT void dpx::Reader::SetInStream(InStream *fd)
 {
 	this->fd = fd;
 	this->Reset();
 }
 
 
-bool dpx::Reader::ReadHeader()
+DPX_EXPORT bool dpx::Reader::ReadHeader()
 {
 	return this->header.Read(this->fd);
 }
 
 
-bool dpx::Reader::ReadImage(const int element, void *data)
+DPX_EXPORT bool dpx::Reader::ReadImage(const int element, void *data)
 {
 	// make sure the range is good
 	if (element < 0 || element >= MAX_ELEMENTS)
@@ -107,7 +116,7 @@ bool dpx::Reader::ReadImage(const int element, void *data)
 }
 
 
-bool dpx::Reader::ReadImage(void *data, const DataSize size, const Descriptor desc)
+DPX_EXPORT bool dpx::Reader::ReadImage(void *data, const DataSize size, const Descriptor desc)
 {
 	Block block(0, 0, this->header.Width()-1, this->header.Height()-1);
 	return this->ReadBlock(data, size, block, desc);
@@ -119,9 +128,9 @@ bool dpx::Reader::ReadImage(void *data, const DataSize size, const Descriptor de
 	block - this contains the square block of data to read in.  The data elements in this
 		structure need to be normalized Left to Right, Top to Bottom.
   */
-  
 
-bool dpx::Reader::ReadBlock(const int element, unsigned char *data, Block &block)
+
+DPX_EXPORT bool dpx::Reader::ReadBlock(const int element, unsigned char *data, Block &block)
 {
 	// make sure the range is good
 	if (element < 0 || element >= MAX_ELEMENTS)
@@ -133,9 +142,29 @@ bool dpx::Reader::ReadBlock(const int element, unsigned char *data, Block &block
 
 	return this->ReadBlock(data, this->header.ComponentDataSize(element), block, this->header.ImageDescriptor(element));
 }
-  
 
-/* 
+
+#ifdef LIBDPX_THREADS
+
+class EndianSwapImageBufferTask : public Task
+{
+  public:
+	EndianSwapImageBufferTask(TaskGroup *group, dpx::DataSize size, void *data, int length) :
+		Task(group), _size(size), _data(data), _length(length) {}
+
+	virtual ~EndianSwapImageBufferTask() {}
+
+	virtual void execute() { dpx::EndianSwapImageBuffer(_size, _data, _length); }
+
+  private:
+	dpx::DataSize _size;
+	void *_data;
+	int _length;
+};
+
+#endif
+
+/*
 	implementation notes:
 
 	dpx::readBlock reads in the image starting from the beginning of the channel.  This can
@@ -145,8 +174,8 @@ bool dpx::Reader::ReadBlock(const int element, unsigned char *data, Block &block
 
 */
 
-bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const Descriptor desc)
-{	
+DPX_EXPORT bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const Descriptor desc)
+{
 	int i;
 	int element;
 
@@ -154,9 +183,9 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 	block.Check();
 
 	// determine which element we are viewing
-	for (i = 0; i < MAX_ELEMENTS; i++) 
+	for (i = 0; i < MAX_ELEMENTS; i++)
 	{
-		if (this->header.ImageDescriptor(i) == desc) 
+		if (this->header.ImageDescriptor(i) == desc)
 		{
 			element = i;
 			break;
@@ -164,8 +193,8 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 	}
 	if (i == MAX_ELEMENTS)					// was it found?
 		return false;
-	
-				
+
+
 	// get the number of components for this element descriptor
 	const int numberOfComponents = this->header.ImageElementComponentCount(element);
 
@@ -178,7 +207,7 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 
 	// lets see if this can be done in a single fast read
 	if (!rle && this->header.EndOfLinePadding(element) == 0 &&
-		((bitDepth == 8 && size == dpx::kByte) || 
+		((bitDepth == 8 && size == dpx::kByte) ||
 		 (bitDepth == 16 && size == dpx::kWord) ||
 		 (bitDepth == 32 && size == dpx::kFloat) ||
 		 (bitDepth == 64 && size == dpx::kDouble)) &&
@@ -195,15 +224,39 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 		size_t rs = this->fd->ReadDirect(data, imageByteSize);
 		if (rs != imageByteSize)
 			return false;
-			
-		// swap the bytes if different byte order	
+
+		// swap the bytes if different byte order
 		if (this->header.RequiresByteSwap())
+		{
+		#ifdef LIBDPX_THREADS
+			TaskGroup taskGroup;
+
+			size_t remainingImageSize = imageSize;
+
+			const size_t taskSize = 4096;
+			const size_t taskByteSize = taskSize * bitDepth / 8;
+
+			char *taskData = (char *)data;
+
+			while(remainingImageSize)
+			{
+				const size_t thisTaskSize = (remainingImageSize < taskSize ? remainingImageSize : taskSize);
+
+				ThreadPool::addGlobalTask(new EndianSwapImageBufferTask(&taskGroup, size, taskData, thisTaskSize) );
+
+				remainingImageSize -= thisTaskSize;
+
+				taskData += taskByteSize;
+			}
+		#else
 			dpx::EndianSwapImageBuffer(size, data, imageSize);
-	
+		#endif
+		}
+
 		return true;
 	}
 
-	
+
 	// determine if the encoding system is loaded
 	if (this->codex[element] == 0)
 	{
@@ -218,16 +271,16 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 
 	// read the image block
 	return this->codex[element]->Read(this->header, this->rio, element, block, data, size);
-}	
+}
 
 
 
-bool dpx::Reader::ReadUserData(unsigned char *data)
+DPX_EXPORT bool dpx::Reader::ReadUserData(unsigned char *data)
 {
 	// check to make sure there is some user data
 	if (this->header.UserSize() == 0)
 		return true;
-		
+
 	// seek to the beginning of the user data block
 	if (this->fd->Seek(sizeof(GenericHeader) + sizeof(IndustryHeader), InStream::kStart) == false)
 		return false;
@@ -235,7 +288,7 @@ bool dpx::Reader::ReadUserData(unsigned char *data)
 	size_t rs = this->fd->ReadDirect(data, this->header.UserSize());
 	if (rs != this->header.UserSize())
 		return false;
-	
+
 	return true;
 }
 
