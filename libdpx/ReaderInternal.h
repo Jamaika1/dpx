@@ -55,6 +55,11 @@
 #define	REVERSE_12BITPACKED				4
 
 
+#ifdef LIBDPX_THREADS
+#include <IlmThread.h>
+#include <IlmThreadPool.h>
+#endif
+
 
 
 namespace dpx 
@@ -117,6 +122,81 @@ namespace dpx
 		}
 #endif		
 	}
+
+#ifdef LIBDPX_THREADS	
+	template <typename IR, typename BUF, int PADDINGBITS>
+	class Read10bitFilledTask : public IlmThread::Task
+	{
+	  public:
+		Read10bitFilledTask(IlmThread::TaskGroup *group,
+						const Header &dpxHeader, IR *fd, const int element, const Block &block, BUF *data,
+						int line, const int numberOfComponents, int datums, long offset, int readSize);
+		virtual ~Read10bitFilledTask();
+		
+		virtual void execute();
+		
+	  private:
+		const Block &_block;
+		BUF *_data;
+		int _line;
+		const int _numberOfComponents;
+		int _datums;
+		
+		U32 *_readBuf;
+	};
+	
+	template <typename IR, typename BUF, int PADDINGBITS>
+	Read10bitFilledTask<IR, BUF, PADDINGBITS>::Read10bitFilledTask(IlmThread::TaskGroup *group,
+						const Header &dpxHeader, IR *fd, const int element, const Block &block, BUF *data,
+						int line, const int numberOfComponents, int datums, long offset, int readSize) :
+		Task(group),
+		_block(block),
+		_data(data),
+		_line(line),
+		_numberOfComponents(numberOfComponents),
+		_datums(datums),
+		_readBuf(NULL)
+	{
+		_readBuf = new U32[(readSize / sizeof(U32))+1];
+	
+		fd->Read(dpxHeader, element, offset, _readBuf, readSize);
+	}
+	
+	template <typename IR, typename BUF, int PADDINGBITS>
+	Read10bitFilledTask<IR, BUF, PADDINGBITS>::~Read10bitFilledTask()
+	{
+		delete [] _readBuf;
+	}
+	
+	template <typename IR, typename BUF, int PADDINGBITS>
+	void Read10bitFilledTask<IR, BUF, PADDINGBITS>::execute()
+	{
+		// determine buffer offset
+		int bufoff = _line * _datums;
+		
+		// unpack the words in the buffer
+#if RLE_WORKING			
+		int count = (_block.x2 - _block.x1 + 1) * _numberOfComponents;
+		Unfill10bitFilled<BUF, PADDINGBITS>(_readBuf, _block.x1, _data, count, bufoff, _numberOfComponents);
+#else					
+		BUF *obuf = _data + bufoff;
+		int index = (_block.x1 * sizeof(U32)) % _numberOfComponents;
+
+		for (int count = (_block.x2 - _block.x1 + 1) * _numberOfComponents - 1; count >= 0; count--)
+		{
+			// unpacking the buffer backwords
+			U16 d1 = U16(_readBuf[(count + index) / 3] >> ((2 - (count + index) % 3) * 10 + PADDINGBITS) & 0x3ff);
+			BaseTypeConvertU10ToU16(d1, d1);
+
+			BaseTypeConverter(d1, obuf[count]);
+
+			// work-around for 1-channel DPX images - to swap the outlying pixels, otherwise the columns are in the wrong order
+			if (_numberOfComponents == 1 && count % 3 == 0)
+				std::swap(obuf[count], obuf[count + 2]);
+		}
+#endif
+	}
+#endif //LIBDPX_THREADS
 	
 	template <typename IR, typename BUF, int PADDINGBITS>
 	bool Read10bitFilled(const Header &dpxHeader, U32 *readBuf, IR *fd, const int element, const Block &block, BUF *data)
@@ -132,7 +212,10 @@ namespace dpx
 		
 		// number of datums in one row
 		int datums = dpxHeader.Width() * numberOfComponents;
-		
+
+#ifdef LIBDPX_THREADS
+		IlmThread::TaskGroup taskGroup;
+#endif
 		// read in each line at a time directly into the user memory space
 		for (int line = 0; line < height; line++)
 		{
@@ -164,6 +247,11 @@ namespace dpx
 			readSize += readSize % 3;
 			readSize = readSize / 3 * 4;
 			
+#ifdef LIBDPX_THREADS
+			IlmThread::ThreadPool::addGlobalTask(new Read10bitFilledTask<IR, BUF, PADDINGBITS>(&taskGroup,
+											dpxHeader, fd, element, block, data,
+											line, numberOfComponents, datums, offset, readSize) );
+#else
 			// determine buffer offset
 			int bufoff = line * datums;
 	
@@ -189,7 +277,8 @@ namespace dpx
 				if (numberOfComponents == 1 && count % 3 == 0)
 					std::swap(obuf[count], obuf[count + 2]);
 			}
-#endif		
+#endif
+#endif
 		}
 	
 		return true;
@@ -260,6 +349,66 @@ namespace dpx
 		}		
 	}
 
+#ifdef LIBDPX_THREADS
+	template <typename IR, typename BUF, U32 MASK, int MULTIPLIER, int REMAIN, int REVERSE>
+	class ReadPackedTask : public IlmThread::Task
+	{
+	  public:
+		ReadPackedTask(IlmThread::TaskGroup *group,
+						const Header &dpxHeader, IR *fd, const int element, const Block &block, BUF *data,
+						int readSize, int line, long offset, const int numberOfComponents, const int dataSize);
+		virtual ~ReadPackedTask();
+		
+		virtual void execute();
+		
+	  private:
+		const Header &_dpxHeader;
+		const Block &_block;
+		BUF *_data;
+		int _readSize;
+		int _line;
+		const int _numberOfComponents;
+		const int _dataSize;
+		
+		U32 *_readBuf;
+	};
+	
+	template <typename IR, typename BUF, U32 MASK, int MULTIPLIER, int REMAIN, int REVERSE>
+	ReadPackedTask<IR, BUF, MASK, MULTIPLIER, REMAIN, REVERSE>::ReadPackedTask(IlmThread::TaskGroup *group,
+						const Header &dpxHeader, IR *fd, const int element, const Block &block, BUF *data,
+						int readSize, int line, long offset, const int numberOfComponents, const int dataSize) :
+		Task(group),
+		_dpxHeader(dpxHeader),
+		_block(block),
+		_data(data),
+		_line(line),
+		_numberOfComponents(numberOfComponents),
+		_dataSize(dataSize),
+		_readBuf(NULL)
+	{
+		_readBuf = new U32[(readSize / sizeof(U32))+1];
+		
+		fd->Read(_dpxHeader, element, offset, _readBuf, readSize);
+	}
+	
+	template <typename IR, typename BUF, U32 MASK, int MULTIPLIER, int REMAIN, int REVERSE>
+	ReadPackedTask<IR, BUF, MASK, MULTIPLIER, REMAIN, REVERSE>::~ReadPackedTask()
+	{
+		delete [] _readBuf;
+	}
+
+	template <typename IR, typename BUF, U32 MASK, int MULTIPLIER, int REMAIN, int REVERSE>
+	void ReadPackedTask<IR, BUF, MASK, MULTIPLIER, REMAIN, REVERSE>::execute()
+	{
+		// calculate buffer offset
+		int bufoff = _line * _dpxHeader.Width() * _numberOfComponents;
+
+		// unpack the words in the buffer
+		int count = (_block.x2 - _block.x1 + 1) * _numberOfComponents;
+		UnPackPacked<BUF, MASK, MULTIPLIER, REMAIN, REVERSE>(_readBuf, _dataSize, _data, count, bufoff);
+	}
+	
+#endif //LIBDPX_THREADS
 	
 	template <typename IR, typename BUF, U32 MASK, int MULTIPLIER, int REMAIN, int REVERSE>
 	bool ReadPacked(const Header &dpxHeader, U32 *readBuf, IR *fd, const int element, const Block &block, BUF *data)
@@ -279,6 +428,9 @@ namespace dpx
 		// number of bytes 
 		const int lineSize = (dpxHeader.Width() * numberOfComponents * dataSize + 31) / 32;
 
+#ifdef LIBDPX_THREADS
+		IlmThread::TaskGroup taskGroup;
+#endif
 		// read in each line at a time directly into the user memory space
 		for (int line = 0; line < height; line++)
 		{
@@ -291,14 +443,20 @@ namespace dpx
 			readSize += (block.x1 * numberOfComponents * dataSize % 32);			// add the bits left over from the beginning of the line
 			readSize = ((readSize + 31) / 32) * sizeof(U32);
 
+#ifdef LIBDPX_THREADS
+			IlmThread::ThreadPool::addGlobalTask(new ReadPackedTask<IR, BUF, MASK, MULTIPLIER, REMAIN, REVERSE>(&taskGroup,
+											dpxHeader, fd, element, block, data,
+											readSize, line, offset, numberOfComponents, dataSize) );
+#else
+			fd->Read(dpxHeader, element, offset, readBuf, readSize);
+
 			// calculate buffer offset
 			int bufoff = line * dpxHeader.Width() * numberOfComponents;
 	
-			fd->Read(dpxHeader, element, offset, readBuf, readSize);
-
 			// unpack the words in the buffer
 			int count = (block.x2 - block.x1 + 1) * numberOfComponents;
 			UnPackPacked<BUF, MASK, MULTIPLIER, REMAIN, REVERSE>(readBuf, dataSize, data, count, bufoff);
+#endif //LIBDPX_THREADS
 		}
 
 		return true;
@@ -318,6 +476,56 @@ namespace dpx
 		return ReadPacked<IR, BUF, MASK_12BITPACKED, MULTIPLIER_12BITPACKED, REMAIN_12BITPACKED, REVERSE_12BITPACKED>(dpxHeader, readBuf, fd, element, block, data);
 	}
 
+#ifdef LIBDPX_THREADS
+	template <typename IR, typename SRC, typename BUF>
+	class ReadBlockTypesTask : public IlmThread::Task
+	{
+	  public:
+		ReadBlockTypesTask(IlmThread::TaskGroup *group,
+							const Header &dpxHeader, IR *fd, const int element, BUF *data,
+							long offset, int line, const int width, const int bytes);
+		virtual ~ReadBlockTypesTask();
+		
+		virtual void execute();
+		
+	  private:
+		BUF *_data;
+		int _line;
+		const int _width;
+		
+		SRC *_readBuf;
+	};
+	
+	template <typename IR, typename SRC, typename BUF>
+	ReadBlockTypesTask<IR, SRC, BUF>::ReadBlockTypesTask(IlmThread::TaskGroup *group,
+								const Header &dpxHeader, IR *fd, const int element, BUF *data,
+								long offset, int line, const int width, const int bytes) :
+		Task(group),
+		_data(data),
+		_line(line),
+		_width(width),
+		_readBuf(NULL)
+	{
+		_readBuf = new SRC[ ((_width * bytes) / sizeof(SRC))+1 ];
+		
+		fd->Read(dpxHeader, element, offset, _readBuf, _width * bytes);
+	}
+	
+	template <typename IR, typename SRC, typename BUF>
+	ReadBlockTypesTask<IR, SRC, BUF>::~ReadBlockTypesTask()
+	{
+		delete [] _readBuf;
+	}
+	
+	template <typename IR, typename SRC, typename BUF>
+	void ReadBlockTypesTask<IR, SRC, BUF>::execute()
+	{
+		// convert data		
+		for (int i = 0; i < _width; i++)
+			BaseTypeConverter(_readBuf[i], _data[_width * _line + i]);
+	}
+
+#endif //LIBDPX_THREADS
 
 	template <typename IR, typename SRC, DataSize SRCTYPE, typename BUF, DataSize BUFTYPE>
 	bool ReadBlockTypes(const Header &dpxHeader, SRC *readBuf, IR *fd, const int element, const Block &block, BUF *data)
@@ -340,6 +548,9 @@ namespace dpx
 		// image width
 		const int imageWidth = dpxHeader.Width();
 		
+#ifdef LIBDPX_THREADS
+		IlmThread::TaskGroup taskGroup;
+#endif
 		// read in each line at a time directly into the user memory space
 		for (int line = 0; line < height; line++)
 		{
@@ -354,11 +565,17 @@ namespace dpx
 			}
 			else
 			{
+#ifdef LIBDPX_THREADS
+				IlmThread::ThreadPool::addGlobalTask(new ReadBlockTypesTask<IR, SRC, BUF>(&taskGroup,
+														dpxHeader, fd, element, data,
+														offset, line, width, bytes) );
+#else
 				fd->Read(dpxHeader, element, offset, readBuf, width*bytes);
 							
 				// convert data		
 				for (int i = 0; i < width; i++)
 					BaseTypeConverter(readBuf[i], data[width*line+i]);
+#endif
 			}
 	
 		}
@@ -366,9 +583,64 @@ namespace dpx
 		return true;
 	}
 
+#ifdef LIBDPX_THREADS
+	template <typename IR, typename BUF, bool METHODB>
+	class Read12bitFilledTask : public IlmThread::Task
+	{
+	  public:
+		Read12bitFilledTask(IlmThread::TaskGroup *group,
+							const Header &dpxHeader, IR *fd, const int element, BUF *data,
+							long offset, int line, const int width);
+		virtual ~Read12bitFilledTask();
+		
+		virtual void execute();
+		
+	  private:
+		BUF *_data;
+		int _line;
+		const int _width;
+		
+		U16 *_readBuf;
+	};
+	
+	template <typename IR, typename BUF, bool METHODB>
+	Read12bitFilledTask<IR, BUF, METHODB>::Read12bitFilledTask(IlmThread::TaskGroup *group,
+								const Header &dpxHeader, IR *fd, const int element, BUF *data,
+								long offset, int line, const int width) :
+		Task(group),
+		_data(data),
+		_line(line),
+		_width(width),
+		_readBuf(NULL)
+	{
+		_readBuf = new U16[_width * 2];
+		
+		fd->Read(dpxHeader, element, offset, _readBuf, _width * 2);
+	}
+	
+	template <typename IR, typename BUF, bool METHODB>
+	Read12bitFilledTask<IR, BUF, METHODB>::~Read12bitFilledTask()
+	{
+		delete [] _readBuf;
+	}
+	
+	template <typename IR, typename BUF, bool METHODB>
+	void Read12bitFilledTask<IR, BUF, METHODB>::execute()
+	{
+		const int downshift = (METHODB ? 0 : 4);
+		
+		// convert data		
+		for (int i = 0; i < _width; i++)
+		{
+			U16 d1 = _readBuf[i] >> downshift;
+			BaseTypeConvertU12ToU16(d1, d1);
+			BaseTypeConverter(d1, _data[_width * _line + i]);
+		}
+	}
+#endif
 
-	template <typename IR, typename BUF>
-	bool Read12bitFilledMethodB(const Header &dpxHeader, U16 *readBuf, IR *fd, const int element, const Block &block, BUF *data)
+	template <typename IR, typename BUF, bool METHODB>
+	bool Read12bitFilled(const Header &dpxHeader, U16 *readBuf, IR *fd, const int element, const Block &block, BUF *data)
 	{
 		// get the number of components for this element descriptor
 		const int numberOfComponents = dpxHeader.ImageElementComponentCount(element);
@@ -385,6 +657,9 @@ namespace dpx
 		if (eolnPad == ~0)
 			eolnPad = 0;
 				
+#ifdef LIBDPX_THREADS
+		IlmThread::TaskGroup taskGroup;
+#endif
 		// read in each line at a time directly into the user memory space
 		for (int line = 0; line < height; line++)
 		{
@@ -392,15 +667,23 @@ namespace dpx
 			long offset = (line + block.y1) * imageWidth * numberOfComponents * 2 +
 						block.x1 * numberOfComponents * 2 + (line * eolnPad);
 	
+#ifdef LIBDPX_THREADS
+			IlmThread::ThreadPool::addGlobalTask(new Read12bitFilledTask<IR, BUF, METHODB>(&taskGroup,
+													dpxHeader, fd, element, data,
+													offset, line, width) );
+#else
 			fd->Read(dpxHeader, element, offset, readBuf, width*2);
-				
+			
+			const int downshift = (METHODB ? 0 : 4);
+			
 			// convert data		
 			for (int i = 0; i < width; i++)
 			{
-				U16 d1 = readBuf[i];
+				U16 d1 = readBuf[i] >> downshift;
 				BaseTypeConvertU12ToU16(d1, d1);
 				BaseTypeConverter(d1, data[width*line+i]);
 			}
+#endif //LIBDPX_THREADS
 		}
 
 		return true;
@@ -458,11 +741,11 @@ namespace dpx
 			else if (packing == kFilledMethodB)
 				// filled method B
 				// 12 bits fill LSB of 16 bits
-				return Read12bitFilledMethodB<IR, BUF>(dpxHeader, reinterpret_cast<U16 *>(readBuf), fd, element, block, reinterpret_cast<BUF *>(data));
+				return Read12bitFilled<IR, BUF, true>(dpxHeader, reinterpret_cast<U16 *>(readBuf), fd, element, block, reinterpret_cast<BUF *>(data));
 			else	
 				// filled method A
 				// 12 bits fill MSB of 16 bits
-				return ReadBlockTypes<IR, U16, kWord, BUF, BUFTYPE>(dpxHeader, reinterpret_cast<U16 *>(readBuf), fd, element, block, reinterpret_cast<BUF *>(data));
+				return Read12bitFilled<IR, BUF, false>(dpxHeader, reinterpret_cast<U16 *>(readBuf), fd, element, block, reinterpret_cast<BUF *>(data));
 		}
 		else if (size == dpx::kByte)
 			return ReadBlockTypes<IR, U8, kByte, BUF, BUFTYPE>(dpxHeader, reinterpret_cast<U8 *>(readBuf), fd, element, block, reinterpret_cast<BUF *>(data));

@@ -44,6 +44,14 @@
 #include "RunLengthEncoding.h"
 
 
+#ifdef LIBDPX_THREADS
+#include <IlmThread.h>
+#include <IlmThreadPool.h>
+
+using namespace IlmThread;
+#endif
+
+
 
 dpx::Reader::Reader() : fd(0), rio(0)
 {
@@ -135,6 +143,26 @@ bool dpx::Reader::ReadBlock(const int element, unsigned char *data, Block &block
 }
   
 
+#ifdef LIBDPX_THREADS
+
+class EndianSwapImageBufferTask : public Task
+{
+  public:
+	EndianSwapImageBufferTask(TaskGroup *group, dpx::DataSize size, void *data, int length) :
+		Task(group), _size(size), _data(data), _length(length) {}
+		
+	virtual ~EndianSwapImageBufferTask() {}
+	
+	virtual void execute() { dpx::EndianSwapImageBuffer(_size, _data, _length); }
+
+  private:
+	dpx::DataSize _size;
+	void *_data;
+	int _length;
+};
+
+#endif
+
 /* 
 	implementation notes:
 
@@ -198,7 +226,31 @@ bool dpx::Reader::ReadBlock(void *data, const DataSize size, Block &block, const
 			
 		// swap the bytes if different byte order	
 		if (this->header.RequiresByteSwap())
+		{
+		#ifdef LIBDPX_THREADS
+			TaskGroup taskGroup;
+			
+			size_t remainingImageSize = imageSize;
+		
+			const size_t taskSize = 4096;
+			const size_t taskByteSize = taskSize * bitDepth / 8;
+			
+			char *taskData = (char *)data;
+			
+			while(remainingImageSize)
+			{
+				const size_t thisTaskSize = (remainingImageSize < taskSize ? remainingImageSize : taskSize);
+				
+				ThreadPool::addGlobalTask(new EndianSwapImageBufferTask(&taskGroup, size, taskData, thisTaskSize) );
+				
+				remainingImageSize -= thisTaskSize;
+				
+				taskData += taskByteSize;
+			}
+		#else
 			dpx::EndianSwapImageBuffer(size, data, imageSize);
+		#endif
+		}
 	
 		return true;
 	}
