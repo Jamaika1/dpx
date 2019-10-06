@@ -5,7 +5,7 @@
  * Copyright (c) 2009, Patrick A. Palmer.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  *   - Redistributions of source code must retain the above copyright notice,
@@ -19,20 +19,20 @@
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
- 
- 
+
+
 
 #include <cassert>
 #include <cstdio>
@@ -54,7 +54,7 @@ static void EmptyString(char *, const int);
 
 char Hex(char x)
 {
-	if (x >= 10) 
+	if (x >= 10)
 		return (x-10+'A');
 	else
 		return (x+'0');
@@ -62,19 +62,19 @@ char Hex(char x)
 
 
 
-dpx::Header::Header() : GenericHeader(), IndustryHeader(), datumSwap(true)
+DPX_EXPORT dpx::Header::Header() : GenericHeader(), IndustryHeader(), datumSwap(true)
 {
 }
 
 
 
-dpx::GenericHeader::GenericHeader() 
+DPX_EXPORT dpx::GenericHeader::GenericHeader()
 {
 	this->Reset();
 }
 
 
-void dpx::GenericHeader::Reset()
+DPX_EXPORT void dpx::GenericHeader::Reset()
 {
 	// File Information
 	this->magicNumber = MAGIC_COOKIE;
@@ -128,13 +128,13 @@ void dpx::GenericHeader::Reset()
 }
 
 
-dpx::IndustryHeader::IndustryHeader()
+DPX_EXPORT dpx::IndustryHeader::IndustryHeader()
 {
 	this->Reset();
 }
 
 
-void dpx::IndustryHeader::Reset()
+DPX_EXPORT void dpx::IndustryHeader::Reset()
 {
 	// Motion Picture Industry Specific
 	EmptyString(this->filmManufacturingIdCode, 2);
@@ -162,7 +162,7 @@ void dpx::IndustryHeader::Reset()
 }
 
 
-dpx::ImageElement::ImageElement()
+DPX_EXPORT dpx::ImageElement::ImageElement()
 {
 	this->dataSign = 0xffffffff;
 	this->lowData = 0xffffffff;
@@ -170,7 +170,7 @@ dpx::ImageElement::ImageElement()
 	this->highData = 0xffffffff;
 	this->highQuantity = 0xffffffff;
 	this->descriptor = kUndefinedDescriptor;
-	this->transfer = kUndefinedCharacteristic;	
+	this->transfer = kUndefinedCharacteristic;
 	this->colorimetric = kUndefinedCharacteristic;
 	this->bitDepth = 0xff;
 	this->packing = this->encoding = 0xffff;
@@ -179,7 +179,7 @@ dpx::ImageElement::ImageElement()
 }
 
 
-bool dpx::Header::Read(InStream *io)
+DPX_EXPORT bool dpx::Header::Read(InStream *io)
 {
 	// rewind file
 	io->Rewind();
@@ -196,7 +196,7 @@ bool dpx::Header::Read(InStream *io)
 
 // Check to see if the compiler placed the data members in the expected memory offsets
 
-bool dpx::Header::Check()
+DPX_EXPORT bool dpx::Header::Check()
 {
 	// genericSize is the size of the file/image/orientation headers
 	// sizeof(dpx::GenericHeader) won't give the correct results because
@@ -213,17 +213,17 @@ bool dpx::Header::Check()
 	//		television header is 128 bytes
 	if (sizeof(IndustryHeader) != (256 + 128))
 		return false;
-	
+
 	// data size checks
 	if (sizeof(U8) != 1 || sizeof(U16) != 2 || sizeof(U32) != 4 || sizeof(R32) != 4 || sizeof(R64) != 8)
 		return false;
-		
+
 	return true;
 }
 
 
 
-bool dpx::Header::Write(OutStream *io)
+DPX_EXPORT bool dpx::Header::Write(OutStream *io)
 {
 	// validate and byte swap, if necessary
 	if (!this->Validate())
@@ -240,7 +240,7 @@ bool dpx::Header::Write(OutStream *io)
 }
 
 
-bool dpx::Header::WriteOffsetData(OutStream *io)
+DPX_EXPORT bool dpx::Header::WriteOffsetData(OutStream *io)
 {
 	// calculate the number of elements
 	this->CalculateNumberOfElements();
@@ -255,8 +255,8 @@ bool dpx::Header::WriteOffsetData(OutStream *io)
 		return false;
 	if (this->RequiresByteSwap())
 		SwapBytes(this->imageOffset);
-			
-	
+
+
 	// write the file size
 	const long FIELD4 = 16;			// offset to total image file size in header
 	if (io->Seek(FIELD4, OutStream::kStart) == false)
@@ -267,7 +267,7 @@ bool dpx::Header::WriteOffsetData(OutStream *io)
 		return false;
 	if (this->RequiresByteSwap())
 		SwapBytes(this->fileSize);
-			
+
 	// write the number of elements
 	const long FIELD19 = 770;		// offset to number of image elements in header
 	if (io->Seek(FIELD19, OutStream::kStart) == false)
@@ -278,18 +278,18 @@ bool dpx::Header::WriteOffsetData(OutStream *io)
 		return false;
 	if (this->RequiresByteSwap())
 		SwapBytes(this->numberOfElements);
-	
+
 	// write the image offsets
 	const long FIELD21_12 = 808;	// offset to image offset in image element data structure
 	const long IMAGE_STRUCTURE = 72;	// sizeof the image data structure
-	
+
 	int i;
 	for (i = 0; i < MAX_ELEMENTS; i++)
 	{
 			// only write if there is a defined image description
 			if (this->chan[i].descriptor == kUndefinedDescriptor)
 				continue;
-				
+
 			// seek to the image offset entry in each image element
 			if (io->Seek((FIELD21_12 + (IMAGE_STRUCTURE * i)), OutStream::kStart) == false)
 				return false;
@@ -303,15 +303,15 @@ bool dpx::Header::WriteOffsetData(OutStream *io)
 				SwapBytes(this->chan[i].dataOffset);
 
 	}
-	
+
 	return true;
 }
 
 
-bool dpx::Header::ValidMagicCookie(const U32 magic)
+DPX_EXPORT bool dpx::Header::ValidMagicCookie(const U32 magic)
 {
 	U32 mc = MAGIC_COOKIE;
-	
+
 	if (magic == mc)
 		return true;
 	else if (magic == SwapBytes(mc))
@@ -321,25 +321,25 @@ bool dpx::Header::ValidMagicCookie(const U32 magic)
 }
 
 
-bool dpx::Header::DetermineByteSwap(const U32 magic) const
+DPX_EXPORT bool dpx::Header::DetermineByteSwap(const U32 magic) const
 {
 	U32 mc = MAGIC_COOKIE;
-	
+
 	bool byteSwap = false;
-	
+
 	if (magic != mc)
 		byteSwap = true;
-	
+
 	return byteSwap;
 }
 
-		
-bool dpx::Header::Validate()
+
+DPX_EXPORT bool dpx::Header::Validate()
 {
 	// check magic cookie
 	if (!this->ValidMagicCookie(this->magicNumber))
 		return false;
-		
+
 	// determine if bytes needs to be swapped around
 	if (this->DetermineByteSwap(this->magicNumber))
 	{
@@ -357,7 +357,7 @@ bool dpx::Header::Validate()
 		SwapBytes(this->numberOfElements);
 		SwapBytes(this->pixelsPerLine);
 		SwapBytes(this->linesPerElement);
-		for (int i = 0; i < MAX_ELEMENTS; i++) 
+		for (int i = 0; i < MAX_ELEMENTS; i++)
 		{
 			SwapBytes(this->chan[i].dataSign);
 			SwapBytes(this->chan[i].lowData);
@@ -417,24 +417,24 @@ bool dpx::Header::Validate()
 		SwapBytes(this->whiteLevel);
 		SwapBytes(this->integrationTimes);
 	}
-	
+
 	return true;
 }
 
 
 
-void dpx::Header::Reset()
+DPX_EXPORT void dpx::Header::Reset()
 {
 	GenericHeader::Reset();
 	IndustryHeader::Reset();
 }
 
 
-int dpx::GenericHeader::ImageElementComponentCount(const int element) const
+DPX_EXPORT int dpx::GenericHeader::ImageElementComponentCount(const int element) const
 {
 	int count = 1;
 
-	switch (this->chan[element].descriptor) 
+	switch (this->chan[element].descriptor)
 	{
 	case kUserDefinedDescriptor:
 	case kRed:
@@ -447,7 +447,7 @@ int dpx::GenericHeader::ImageElementComponentCount(const int element) const
 		count = 1;
 		break;
 	case kCompositeVideo:
-		count = 1; 
+		count = 1;
 		break;
 	case kRGB:
 		count = 3;
@@ -468,8 +468,8 @@ int dpx::GenericHeader::ImageElementComponentCount(const int element) const
 	case kCbYCrA:
 		count = 4;
 		break;
-	case kUserDefined2Comp:			
-		count = 2; 
+	case kUserDefined2Comp:
+		count = 2;
 		break;
 	case kUserDefined3Comp:
 		count = 3;
@@ -495,40 +495,40 @@ int dpx::GenericHeader::ImageElementComponentCount(const int element) const
 }
 
 
-int dpx::GenericHeader::ImageElementCount() const
+DPX_EXPORT int dpx::GenericHeader::ImageElementCount() const
 {
 	if(this->numberOfElements>0 && this->numberOfElements<=MAX_ELEMENTS)
 		return this->numberOfElements;
-	
+
 	// If the image header does not list a valid number of elements,
 	// count how many defined image descriptors we have...
-	
+
 	int i = 0;
-	
+
 	while (i < MAX_ELEMENTS )
 	{
 		if (this->ImageDescriptor(i) == kUndefinedDescriptor)
 			break;
 		i++;
 	}
-	
+
 	return i;
 }
 
 
-void dpx::GenericHeader::CalculateNumberOfElements()
+DPX_EXPORT void dpx::GenericHeader::CalculateNumberOfElements()
 {
 	this->numberOfElements = 0xffff;
 	int i = this->ImageElementCount();
-	
+
 	if (i == 0)
 		this->numberOfElements = 0xffff;
 	else
-		this->numberOfElements = U16(i);	
+		this->numberOfElements = U16(i);
 }
 
 
-void dpx::Header::CalculateOffsets()
+DPX_EXPORT void dpx::Header::CalculateOffsets()
 {
 	int i;
 
@@ -537,19 +537,19 @@ void dpx::Header::CalculateOffsets()
 		// only write if there is a defined image description
 		if (this->chan[i].descriptor == kUndefinedDescriptor)
 			continue;
-	
+
 
 	}
 }
 
 
-dpx::DataSize dpx::GenericHeader::ComponentDataSize(const int element) const
+DPX_EXPORT dpx::DataSize dpx::GenericHeader::ComponentDataSize(const int element) const
 {
 	if (element < 0 || element >= MAX_ELEMENTS)
 		return kByte;
-		
+
 	dpx::DataSize ret;
-	
+
 	switch (this->chan[element].bitDepth)
 	{
 	case 8:
@@ -571,18 +571,18 @@ dpx::DataSize dpx::GenericHeader::ComponentDataSize(const int element) const
 		ret = kDouble;
 		break;
 	}
-	
+
 	return ret;
 }
 
 
-int dpx::GenericHeader::ComponentByteCount(const int element) const
+DPX_EXPORT int dpx::GenericHeader::ComponentByteCount(const int element) const
 {
 	if (element < 0 || element >= MAX_ELEMENTS)
 		return kByte;
-		
+
 	int ret;
-	
+
 	switch (this->chan[element].bitDepth)
 	{
 	case 8:
@@ -604,16 +604,16 @@ int dpx::GenericHeader::ComponentByteCount(const int element) const
 		ret = sizeof(R64);
 		break;
 	}
-	
+
 	return ret;
 }
 
 
-int dpx::GenericHeader::DataSizeByteCount(const DataSize ds)
+DPX_EXPORT int dpx::GenericHeader::DataSizeByteCount(const DataSize ds)
 {
 
 	int ret;
-	
+
 	switch (ds)
 	{
 	case kByte:
@@ -636,12 +636,12 @@ int dpx::GenericHeader::DataSizeByteCount(const DataSize ds)
 		ret = sizeof(R64);
 		break;
 	}
-	
+
 	return ret;
 }
 
 
-void dpx::IndustryHeader::FilmEdgeCode(char *edge) const
+DPX_EXPORT void dpx::IndustryHeader::FilmEdgeCode(char *edge) const
 {
 	edge[0] = this->filmManufacturingIdCode[0];
 	edge[1] = this->filmManufacturingIdCode[1];
@@ -663,7 +663,7 @@ void dpx::IndustryHeader::FilmEdgeCode(char *edge) const
 }
 
 
-void dpx::IndustryHeader::SetFileEdgeCode(const char *edge)
+DPX_EXPORT void dpx::IndustryHeader::SetFileEdgeCode(const char *edge)
 {
 	this->filmManufacturingIdCode[0] = edge[0];
 	this->filmManufacturingIdCode[1] = edge[1];
@@ -684,10 +684,10 @@ void dpx::IndustryHeader::SetFileEdgeCode(const char *edge)
 }
 
 
-void dpx::IndustryHeader::TimeCode(char *str) const
+DPX_EXPORT void dpx::IndustryHeader::TimeCode(char *str) const
 {
 	register U32 tc = this->timeCode;
-	::sprintf(str, "%c%c:%c%c:%c%c:%c%c", 
+	::sprintf(str, "%c%c:%c%c:%c%c:%c%c",
 		Hex((tc & 0xf0000000) >> 28),  Hex((tc & 0xf000000) >> 24),
 		Hex((tc & 0xf00000) >> 20),  Hex((tc & 0xf0000) >> 16),
 		Hex((tc & 0xf000) >> 12),  Hex((tc & 0xf00) >> 8),
@@ -695,10 +695,10 @@ void dpx::IndustryHeader::TimeCode(char *str) const
 }
 
 
-void dpx::IndustryHeader::UserBits(char *str) const
+DPX_EXPORT void dpx::IndustryHeader::UserBits(char *str) const
 {
 	register U32 ub = this->userBits;
-	::sprintf(str, "%c%c:%c%c:%c%c:%c%c", 
+	::sprintf(str, "%c%c:%c%c:%c%c:%c%c",
 		Hex((ub & 0xf0000000) >> 28),  Hex((ub & 0xf000000) >> 24),
 		Hex((ub & 0xf00000) >> 20),  Hex((ub & 0xf0000) >> 16),
 		Hex((ub & 0xf000) >> 12),  Hex((ub & 0xf00) >> 8),
@@ -706,7 +706,7 @@ void dpx::IndustryHeader::UserBits(char *str) const
 }
 
 
-dpx::U32 dpx::IndustryHeader::TCFromString(const char *str) const
+DPX_EXPORT dpx::U32 dpx::IndustryHeader::TCFromString(const char *str) const
 {
 	// make sure the string is the correct length
 	if (::strlen(str) != 11)
@@ -738,7 +738,7 @@ dpx::U32 dpx::IndustryHeader::TCFromString(const char *str) const
 }
 
 
-void dpx::IndustryHeader::SetTimeCode(const char *str)
+DPX_EXPORT void dpx::IndustryHeader::SetTimeCode(const char *str)
 {
 	U32 tc = this->TCFromString(str);
 	if (tc != 0xffffffff)
@@ -746,13 +746,13 @@ void dpx::IndustryHeader::SetTimeCode(const char *str)
 }
 
 
-void dpx::IndustryHeader::SetUserBits(const char *str)
+DPX_EXPORT void dpx::IndustryHeader::SetUserBits(const char *str)
 {
 	U32 ub = this->TCFromString(str);
 	if (ub != 0xffffffff)
 		this->timeCode = ub;
 }
-		
+
 
 
 static void EmptyString(char *str, const int len)
@@ -762,11 +762,11 @@ static void EmptyString(char *str, const int len)
 }
 
 
-void dpx::GenericHeader::SetCreationTimeDate(const long sec)
+DPX_EXPORT void dpx::GenericHeader::SetCreationTimeDate(const long sec)
 {
 	struct tm *tm_time;
 	char str[32];
-	
+
 #ifdef WIN32
 	_tzset();
 #endif
@@ -778,11 +778,11 @@ void dpx::GenericHeader::SetCreationTimeDate(const long sec)
 }
 
 
-void dpx::GenericHeader::SetSourceTimeDate(const long sec)
+DPX_EXPORT void dpx::GenericHeader::SetSourceTimeDate(const long sec)
 {
 	struct tm *tm_time;
 	char str[32];
-	
+
 #ifdef WIN32
 	_tzset();
 #endif
@@ -795,7 +795,7 @@ void dpx::GenericHeader::SetSourceTimeDate(const long sec)
 
 
 
-bool dpx::Header::DatumSwap(const int element) const
+DPX_EXPORT bool dpx::Header::DatumSwap(const int element) const
 {
 	if (this->datumSwap)
 	{
@@ -806,7 +806,7 @@ bool dpx::Header::DatumSwap(const int element) const
 }
 
 
-void dpx::Header::SetDatumSwap(const bool swap)
+DPX_EXPORT void dpx::Header::SetDatumSwap(const bool swap)
 {
 	this->datumSwap = swap;
 }
@@ -816,10 +816,10 @@ void dpx::Header::SetDatumSwap(const bool swap)
 // if an image is 1920x1080 but is oriented top to bottom, left to right then the height stored
 // in the image is 1920 rather than 1080
 
-dpx::U32 dpx::Header::Height() const
+DPX_EXPORT dpx::U32 dpx::Header::Height() const
 {
 	U32 h;
-	
+
 	switch (this->ImageOrientation())
 	{
 	case kTopToBottomLeftToRight:
@@ -828,7 +828,7 @@ dpx::U32 dpx::Header::Height() const
 	case kBottomToTopRightToLeft:
 		h = this->PixelsPerLine();
 		break;
-	default:	
+	default:
 		h = this->LinesPerElement();
 		break;
 	}
@@ -842,7 +842,7 @@ dpx::U32 dpx::Header::Height() const
 // if an image is 1920x1080 but is oriented top to bottom, left to right then the width stored
 // in the image is 1920 rather than 1080
 
-dpx::U32 dpx::Header::Width() const
+DPX_EXPORT dpx::U32 dpx::Header::Width() const
 {
 	U32 w;
 
@@ -854,7 +854,7 @@ dpx::U32 dpx::Header::Width() const
 	case kBottomToTopRightToLeft:
 		w = this->LinesPerElement();
 		break;
-	default:	
+	default:
 		w = this->PixelsPerLine();
 		break;
 	}
